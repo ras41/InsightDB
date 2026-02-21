@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-insight-bg text-insight-text antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .premium-card {
+    @apply bg-white rounded-3xl border border-insight-border shadow-premium transition-all duration-300;
+  }
+  
+  .glass-effect {
+    @apply bg-white/80 backdrop-blur-md border border-white/20;
+  }
+
+  .nav-item {
+    @apply flex flex-col items-center gap-1 text-insight-muted hover:text-brand transition-colors duration-200 cursor-pointer;
+  }
+
+  .nav-item-active {
+    @apply text-brand font-medium;
+  }
+}
