@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Search, SlidersHorizontal, Table, ChevronRight, LayoutGrid, User as UserIcon, GitFork, MessageSquare, Terminal, Loader2, Database, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, SlidersHorizontal, Table, ChevronRight, ChevronDown, ChevronLeft, LayoutGrid, User as UserIcon, GitFork, MessageSquare, Terminal, Loader2, Database, AlertCircle, X, ArrowUpDown, ExternalLink, Columns } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { explorerAPI } from '../services/api';
 import { useConnection } from '../context/ConnectionContext';
 import toast from 'react-hot-toast';
+
+const PAGE_SIZE = 25;
 
 const iconMap = {
     0: Table, 1: UserIcon, 2: LayoutGrid, 3: GitFork, 4: MessageSquare,
@@ -20,14 +22,20 @@ export default function Explorer() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
 
+    // Expanded table data preview state
+    const [expandedTable, setExpandedTable] = useState(null);
+    const [tableData, setTableData] = useState({ rows: [], fields: [], total: 0 });
+    const [tableColumns, setTableColumns] = useState([]);
+    const [dataLoading, setDataLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(0);
+    const [sortCol, setSortCol] = useState(null);
+    const [sortDir, setSortDir] = useState('asc');
+
     const connId = activeConnection?.id;
     const dbName = activeConnection?.database || 'database';
 
     useEffect(() => {
-        if (!connId) {
-            setLoading(false);
-            return;
-        }
+        if (!connId) { setLoading(false); return; }
         fetchData();
     }, [connId, activeTab]);
 
@@ -51,8 +59,75 @@ export default function Explorer() {
         }
     };
 
+    // Fetch table data (rows + columns) for inline preview
+    const fetchTableData = useCallback(async (tableName, page = 0) => {
+        setDataLoading(true);
+        try {
+            const [dataRes, colsRes] = await Promise.all([
+                explorerAPI.getData(connId, tableName, { limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
+                explorerAPI.getColumns(connId, tableName),
+            ]);
+            setTableData(dataRes.data.data || { rows: [], fields: [], total: 0 });
+            setTableColumns(colsRes.data.data || []);
+            setCurrentPage(page);
+        } catch (err) {
+            toast.error('Failed to load table data');
+        } finally {
+            setDataLoading(false);
+        }
+    }, [connId]);
+
+    // Page change — only fetch data, not columns again
+    const changePage = async (tableName, page) => {
+        setDataLoading(true);
+        try {
+            const res = await explorerAPI.getData(connId, tableName, { limit: PAGE_SIZE, offset: page * PAGE_SIZE });
+            setTableData(res.data.data || { rows: [], fields: [], total: 0 });
+            setCurrentPage(page);
+        } catch (err) {
+            toast.error('Failed to load page');
+        } finally {
+            setDataLoading(false);
+        }
+    };
+
     const handleTableClick = (tableName) => {
-        navigate(`/table-detail?table=${encodeURIComponent(tableName)}`);
+        if (expandedTable === tableName) {
+            setExpandedTable(null);
+            return;
+        }
+        setExpandedTable(tableName);
+        setSortCol(null);
+        setSortDir('asc');
+        fetchTableData(tableName, 0);
+    };
+
+    // Client-side sort on current page rows
+    const sortedRows = (() => {
+        if (!sortCol || !tableData.rows?.length) return tableData.rows || [];
+        const sorted = [...tableData.rows].sort((a, b) => {
+            const va = a[sortCol], vb = b[sortCol];
+            if (va == null && vb == null) return 0;
+            if (va == null) return 1;
+            if (vb == null) return -1;
+            if (typeof va === 'number' && typeof vb === 'number') return va - vb;
+            return String(va).localeCompare(String(vb), undefined, { numeric: true });
+        });
+        return sortDir === 'desc' ? sorted.reverse() : sorted;
+    })();
+
+    const totalPages = Math.max(1, Math.ceil((tableData.total || 0) / PAGE_SIZE));
+
+    // Truncate display values
+    const formatCell = (val) => {
+        if (val === null || val === undefined) return <span className="text-slate-300 italic">NULL</span>;
+        if (typeof val === 'boolean') return val ? 'true' : 'false';
+        if (typeof val === 'object') {
+            const s = JSON.stringify(val);
+            return s.length > 80 ? s.slice(0, 80) + '…' : s;
+        }
+        const s = String(val);
+        return s.length > 120 ? s.slice(0, 120) + '…' : s;
     };
 
     if (!connId) {
@@ -76,6 +151,13 @@ export default function Explorer() {
     const filteredViews = views.filter(v => (v.view_name || v.name || '').toLowerCase().includes(search.toLowerCase()));
     const filteredFunctions = functions.filter(f => (f.function_name || f.name || '').toLowerCase().includes(search.toLowerCase()));
 
+    // Determine column names from the first loaded data row (or columns endpoint)
+    const columnNames = tableColumns.length > 0
+        ? tableColumns.map(c => c.column_name)
+        : tableData.rows?.length > 0
+            ? Object.keys(tableData.rows[0])
+            : [];
+
     return (
         <div className="flex-1 flex flex-col min-h-screen bg-[#f8fafc] lg:p-8">
             {/* Page Header */}
@@ -93,7 +175,7 @@ export default function Explorer() {
                     {['tables', 'views', 'functions'].map(tab => (
                         <button
                             key={tab}
-                            onClick={() => setActiveTab(tab)}
+                            onClick={() => { setActiveTab(tab); setExpandedTable(null); }}
                             className={clsx(
                                 "px-6 py-2.5 font-bold text-sm rounded-xl transition-all capitalize",
                                 activeTab === tab ? "bg-brand text-white shadow-elevated" : "text-insight-muted hover:text-insight-text"
@@ -143,48 +225,166 @@ export default function Explorer() {
                                         <p className="text-insight-muted font-bold">No tables found</p>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 overflow-y-auto pr-2 custom-scrollbar">
+                                    <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar">
                                         {filteredTables.map((table, idx) => {
                                             const name = table.table_name || table.name;
-                                            const isActive = idx === 0;
+                                            const isExpanded = expandedTable === name;
                                             const IconComp = iconMap[idx % 5] || Table;
                                             return (
-                                                <div
-                                                    key={name}
-                                                    onClick={() => handleTableClick(name)}
-                                                    className={clsx(
-                                                        "premium-card overflow-hidden group cursor-pointer flex flex-col p-6 h-full transition-all duration-300",
-                                                        isActive
-                                                            ? "bg-brand text-white border-transparent shadow-elevated scale-[1.02] ring-4 ring-brand/5"
-                                                            : "bg-white hover:border-brand/40 hover:shadow-elevated lg:hover:-translate-y-1"
-                                                    )}
-                                                >
-                                                    <div className="flex items-center gap-5 mb-6">
+                                                <div key={name} className="premium-card overflow-hidden transition-all duration-300">
+                                                    {/* Table Card Header */}
+                                                    <div
+                                                        onClick={() => handleTableClick(name)}
+                                                        className={clsx(
+                                                            "flex items-center gap-5 p-6 cursor-pointer transition-all group",
+                                                            isExpanded ? "bg-brand text-white" : "bg-white hover:bg-[#f8fafc]"
+                                                        )}
+                                                    >
                                                         <div className={clsx(
-                                                            "w-14 h-14 rounded-2xl flex items-center justify-center transition-colors",
-                                                            isActive ? "bg-white/20" : "bg-[#eff6ff] text-insight-muted group-hover:text-brand"
+                                                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shrink-0",
+                                                            isExpanded ? "bg-white/20" : "bg-[#eff6ff] text-insight-muted group-hover:text-brand"
                                                         )}>
-                                                            <IconComp size={28} fill={isActive ? "white" : "currentColor"} />
+                                                            <IconComp size={24} />
                                                         </div>
                                                         <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <h4 className="text-xl font-black truncate tracking-tight">{name}</h4>
-                                                            </div>
-                                                            <p className={clsx("text-xs font-bold mt-1", isActive ? "text-white/60" : "text-insight-muted")}>
+                                                            <h4 className="text-lg font-black truncate tracking-tight">{name}</h4>
+                                                            <p className={clsx("text-xs font-bold mt-0.5", isExpanded ? "text-white/60" : "text-insight-muted")}>
                                                                 {table.estimatedRows ? `${Number(table.estimatedRows).toLocaleString()} rows` : 'Table'} {table.size ? `• ${table.size}` : ''}
                                                             </p>
                                                         </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); navigate(`/table-detail?table=${encodeURIComponent(name)}`); }}
+                                                                className={clsx("p-2 rounded-xl transition-colors", isExpanded ? "hover:bg-white/10 text-white/60" : "hover:bg-slate-100 text-slate-400")}
+                                                                title="Open full detail"
+                                                            >
+                                                                <ExternalLink size={16} />
+                                                            </button>
+                                                            <div className={clsx("transition-transform duration-300", isExpanded && "rotate-180")}>
+                                                                <ChevronDown size={20} className={isExpanded ? "text-white/60" : "text-slate-400"} />
+                                                            </div>
+                                                        </div>
                                                     </div>
 
-                                                    {isActive ? (
-                                                        <div className="mt-auto flex gap-3">
-                                                            <button className="flex-1 bg-white/10 hover:bg-white/20 py-3.5 rounded-xl text-xs font-bold transition-colors">Schema</button>
-                                                            <button className="flex-1 bg-white text-brand py-3.5 rounded-xl text-xs font-bold shadow-sm">View Data</button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="mt-auto flex items-center gap-2 text-insight-muted group-hover:text-brand transition-colors">
-                                                            <span className="text-xs font-black uppercase tracking-widest">Explore</span>
-                                                            <ChevronRight size={16} className="ml-auto" />
+                                                    {/* Expanded Data Preview */}
+                                                    {isExpanded && (
+                                                        <div className="border-t border-insight-border">
+                                                            {dataLoading && currentPage === 0 ? (
+                                                                <div className="flex items-center justify-center py-16">
+                                                                    <Loader2 size={32} className="animate-spin text-brand" />
+                                                                    <span className="ml-3 text-sm font-bold text-insight-muted">Loading data...</span>
+                                                                </div>
+                                                            ) : sortedRows.length === 0 ? (
+                                                                <div className="flex flex-col items-center justify-center py-16 text-center">
+                                                                    <Table size={32} className="text-slate-300 mb-3" />
+                                                                    <p className="text-insight-muted font-bold text-sm">Table is empty</p>
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    {/* Column info bar */}
+                                                                    <div className="flex items-center justify-between px-6 py-3 bg-[#f8fafc] border-b border-insight-border/50">
+                                                                        <div className="flex items-center gap-2 text-[10px] font-black text-insight-muted uppercase tracking-widest">
+                                                                            <Columns size={12} />
+                                                                            {columnNames.length} columns • {tableData.total?.toLocaleString()} total rows
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2 text-[10px] font-black text-insight-muted uppercase tracking-widest">
+                                                                            Page {currentPage + 1} of {totalPages}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Data table */}
+                                                                    <div className="overflow-x-auto relative">
+                                                                        {dataLoading && (
+                                                                            <div className="absolute inset-0 bg-white/70 z-10 flex items-center justify-center">
+                                                                                <Loader2 size={24} className="animate-spin text-brand" />
+                                                                            </div>
+                                                                        )}
+                                                                        <table className="w-full text-sm">
+                                                                            <thead>
+                                                                                <tr className="border-b border-insight-border bg-[#f8fafc]">
+                                                                                    <th className="text-left px-4 py-3 text-[10px] font-black text-insight-muted uppercase tracking-widest w-12">#</th>
+                                                                                    {columnNames.map(col => {
+                                                                                        const colMeta = tableColumns.find(c => c.column_name === col);
+                                                                                        const isSorted = sortCol === col;
+                                                                                        return (
+                                                                                            <th
+                                                                                                key={col}
+                                                                                                onClick={() => {
+                                                                                                    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                                                                                                    else { setSortCol(col); setSortDir('asc'); }
+                                                                                                }}
+                                                                                                className="text-left px-4 py-3 text-[10px] font-black text-insight-muted uppercase tracking-widest cursor-pointer hover:text-brand transition-colors select-none whitespace-nowrap"
+                                                                                            >
+                                                                                                <div className="flex items-center gap-1.5">
+                                                                                                    <span>{col}</span>
+                                                                                                    {colMeta && <span className="text-[9px] font-medium text-slate-300 normal-case">({colMeta.data_type})</span>}
+                                                                                                    <ArrowUpDown size={10} className={clsx(isSorted ? "text-brand" : "text-slate-300")} />
+                                                                                                </div>
+                                                                                            </th>
+                                                                                        );
+                                                                                    })}
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                {sortedRows.map((row, ri) => (
+                                                                                    <tr key={ri} className="border-b border-insight-border/30 hover:bg-[#f8fafc] transition-colors">
+                                                                                        <td className="px-4 py-2.5 text-[11px] text-slate-300 font-mono">{currentPage * PAGE_SIZE + ri + 1}</td>
+                                                                                        {columnNames.map(col => (
+                                                                                            <td key={col} className="px-4 py-2.5 text-[13px] text-[#1e293b] font-medium max-w-[300px] truncate">
+                                                                                                {formatCell(row[col])}
+                                                                                            </td>
+                                                                                        ))}
+                                                                                    </tr>
+                                                                                ))}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+
+                                                                    {/* Pagination */}
+                                                                    {totalPages > 1 && (
+                                                                        <div className="flex items-center justify-between px-6 py-4 bg-[#f8fafc] border-t border-insight-border/50">
+                                                                            <button
+                                                                                onClick={() => changePage(name, currentPage - 1)}
+                                                                                disabled={currentPage === 0 || dataLoading}
+                                                                                className="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-white border border-insight-border hover:border-brand/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                                                            >
+                                                                                <ChevronLeft size={14} /> Previous
+                                                                            </button>
+                                                                            <div className="flex items-center gap-1">
+                                                                                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                                                                                    let page;
+                                                                                    if (totalPages <= 7) page = i;
+                                                                                    else if (currentPage < 4) page = i;
+                                                                                    else if (currentPage > totalPages - 5) page = totalPages - 7 + i;
+                                                                                    else page = currentPage - 3 + i;
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={page}
+                                                                                            onClick={() => changePage(name, page)}
+                                                                                            disabled={dataLoading}
+                                                                                            className={clsx(
+                                                                                                "w-8 h-8 rounded-lg text-xs font-bold transition-all",
+                                                                                                page === currentPage
+                                                                                                    ? "bg-brand text-white shadow-sm"
+                                                                                                    : "text-insight-muted hover:bg-slate-100"
+                                                                                            )}
+                                                                                        >
+                                                                                            {page + 1}
+                                                                                        </button>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => changePage(name, currentPage + 1)}
+                                                                                disabled={currentPage >= totalPages - 1 || dataLoading}
+                                                                                className="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl bg-white border border-insight-border hover:border-brand/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                                                            >
+                                                                                Next <ChevronRight size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
