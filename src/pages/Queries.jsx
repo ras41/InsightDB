@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { FileCode, Play, History, Save, Search, Plus, Loader2, Database, AlertCircle, BookmarkCheck } from 'lucide-react';
+import { FileCode, Play, History, Save, Plus, Loader2, Database, AlertCircle, BookmarkCheck } from 'lucide-react';
 import { queryAPI } from '../services/api';
 import { useConnection } from '../context/ConnectionContext';
 import toast from 'react-hot-toast';
@@ -22,7 +22,7 @@ export default function Queries() {
         setHistoryLoading(true);
         try {
             const res = await queryAPI.getHistory({ limit: 10 });
-            setHistory(res.data.data || []);
+            setHistory(res.data.data?.queries || []);
         } catch (err) {
             // silent fail
         } finally {
@@ -82,8 +82,9 @@ export default function Queries() {
     };
 
     return (
-        <div className="flex-1 min-h-screen bg-[#f8fafc] lg:p-10">
-            <div className="max-w-6xl mx-auto space-y-8">
+        <div className="flex-1 min-h-screen bg-[#f8fafc] lg:p-10 pb-32">
+            <div className="max-w-7xl mx-auto space-y-10">
+                {/* Header */}
                 <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 px-6 lg:px-0">
                     <div>
                         <h1 className="text-4xl font-black text-[#0f172a] mb-2 tracking-tight">SQL Queries</h1>
@@ -94,7 +95,7 @@ export default function Queries() {
                         className="flex items-center justify-center gap-3 px-8 py-4 bg-[#0f172a] text-white rounded-2xl font-bold shadow-elevated hover:scale-105 active:scale-95 transition-all"
                     >
                         <Plus size={20} />
-                        New Query
+                        New Analysis
                     </button>
                 </div>
 
@@ -105,7 +106,7 @@ export default function Queries() {
                                 <span>query_editor.sql</span>
                                 <div className="flex gap-4">
                                     <span className="text-brand font-bold underline">
-                                        {activeConnection?.type === 'mysql' ? 'MySQL' : 'PostgreSQL'}
+                                        {activeConnection?.dbType === 'mysql' ? 'MySQL' : 'PostgreSQL'}
                                     </span>
                                     <span className="opacity-40 tracking-tighter">{activeConnection?.database || 'No DB'}</span>
                                 </div>
@@ -149,7 +150,7 @@ export default function Queries() {
                             <div className="premium-card overflow-hidden">
                                 <div className="p-6 border-b border-insight-border flex items-center justify-between">
                                     <h3 className="font-black text-[#0f172a]">Results ({results.rowCount ?? 0} rows)</h3>
-                                    <span className="text-xs font-bold text-insight-muted">{results.executionTime ? `${results.executionTime}ms` : ''}</span>
+                                    <span className="text-xs font-bold text-insight-muted">{results.duration ? `${results.duration}ms` : ''}</span>
                                 </div>
                                 {results.rows && results.rows.length > 0 ? (
                                     <div className="overflow-x-auto max-h-[400px]">
@@ -181,46 +182,46 @@ export default function Queries() {
                         )}
                     </div>
 
+                    {/* Sidebar: History */}
                     <div className="space-y-6">
-                        <h3 className="text-lg font-black text-[#0f172a] tracking-tight ml-1">Recent Queries</h3>
-                        <div className="space-y-4">
-                            {historyLoading ? (
-                                <div className="flex justify-center py-8">
-                                    <Loader2 size={24} className="animate-spin text-brand" />
-                                </div>
-                            ) : history.length === 0 ? (
-                                <div className="premium-card p-8 text-center">
-                                    <AlertCircle size={24} className="mx-auto text-insight-muted mb-3" />
-                                    <p className="text-insight-muted font-bold text-sm">No queries yet</p>
-                                </div>
-                            ) : (
-                                history.map((q) => (
-                                    <div
-                                        key={q.id}
-                                        onClick={() => loadQuery(q)}
-                                        className="premium-card p-5 hover:border-brand/30 transition-all cursor-pointer group"
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-brand/5 group-hover:text-brand transition-colors">
-                                                <FileCode size={20} />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-bold text-[#1e293b] truncate text-sm">{q.sql?.substring(0, 40)}...</h4>
-                                                <p className="text-[10px] font-black text-insight-muted uppercase tracking-widest mt-1">
-                                                    {formatDate(q.executedAt || q.createdAt)} {q.rowCount != null ? `• ${q.rowCount} rows` : ''}
-                                                </p>
-                                            </div>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleToggleSave(q.id); }}
-                                                className={`p-1 transition-colors ${q.isSaved ? 'text-brand' : 'text-slate-300 hover:text-brand'}`}
-                                            >
-                                                <BookmarkCheck size={16} />
-                                            </button>
+                        <h3 className="text-xs font-black text-insight-muted uppercase tracking-[0.2em]">Query History</h3>
+                        {historyLoading ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 size={24} className="animate-spin text-brand" />
+                            </div>
+                        ) : history.length === 0 ? (
+                            <div className="premium-card p-8 text-center">
+                                <AlertCircle size={24} className="mx-auto text-insight-muted mb-3" />
+                                <p className="text-insight-muted font-bold text-sm">No queries yet</p>
+                            </div>
+                        ) : (
+                            history.map((q) => (
+                                <div
+                                    key={q.id}
+                                    onClick={() => loadQuery(q)}
+                                    className="premium-card p-5 hover:border-brand/30 transition-all cursor-pointer group"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-brand/5 group-hover:text-brand transition-colors">
+                                            <FileCode size={20} />
                                         </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-bold text-[#1e293b] truncate text-sm">{q.sql?.substring(0, 40)}...</h4>
+                                            <p className="text-[10px] font-black text-insight-muted uppercase tracking-widest mt-1">
+                                                {formatDate(q.executedAt || q.createdAt)} {q.rowCount != null ? `• ${q.rowCount} rows` : ''}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleToggleSave(q.id); }}
+                                            className={`p-1 transition-colors ${q.isSaved ? 'text-brand' : 'text-slate-300 hover:text-brand'}`}
+                                        >
+                                            <BookmarkCheck size={16} />
+                                        </button>
                                     </div>
-                                ))
-                            )}
-                        </div>
+                                    <p className="text-[11px] font-mono text-slate-400 truncate bg-slate-50/50 p-2 rounded-lg mt-3">{q.sql}</p>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
             </div>

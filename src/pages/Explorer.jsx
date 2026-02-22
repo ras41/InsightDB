@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, SlidersHorizontal, Table, ChevronRight, Sparkles, MessageSquare, LayoutGrid, User as UserIcon, GitFork, Terminal, Loader2, Database, AlertCircle } from 'lucide-react';
+import { Search, SlidersHorizontal, Table, ChevronRight, LayoutGrid, User as UserIcon, GitFork, MessageSquare, Terminal, Loader2, Database, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { explorerAPI } from '../services/api';
@@ -19,7 +19,6 @@ export default function Explorer() {
     const [functions, setFunctions] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [selectedTable, setSelectedTable] = useState(null);
 
     const connId = activeConnection?.id;
     const dbName = activeConnection?.database || 'database';
@@ -38,9 +37,6 @@ export default function Explorer() {
             if (activeTab === 'tables') {
                 const res = await explorerAPI.getTables(connId);
                 setTables(res.data.data || []);
-                if (res.data.data?.length > 0 && !selectedTable) {
-                    setSelectedTable(res.data.data[0].table_name || res.data.data[0].name);
-                }
             } else if (activeTab === 'views') {
                 const res = await explorerAPI.getViews(connId);
                 setViews(res.data.data || []);
@@ -56,7 +52,6 @@ export default function Explorer() {
     };
 
     const handleTableClick = (tableName) => {
-        setSelectedTable(tableName);
         navigate(`/table-detail?table=${encodeURIComponent(tableName)}`);
     };
 
@@ -176,7 +171,7 @@ export default function Explorer() {
                                                                 <h4 className="text-xl font-black truncate tracking-tight">{name}</h4>
                                                             </div>
                                                             <p className={clsx("text-xs font-bold mt-1", isActive ? "text-white/60" : "text-insight-muted")}>
-                                                                {table.estimated_rows ? `${Number(table.estimated_rows).toLocaleString()} rows` : 'Table'} {table.total_size ? `• ${table.total_size}` : ''}
+                                                                {table.estimatedRows ? `${Number(table.estimatedRows).toLocaleString()} rows` : 'Table'} {table.size ? `• ${table.size}` : ''}
                                                             </p>
                                                         </div>
                                                     </div>

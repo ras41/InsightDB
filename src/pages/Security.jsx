@@ -27,7 +27,7 @@ export default function Security() {
                 securityAPI.getSessions(),
             ]);
             setApiKeys(keysRes.data.data || []);
-            setAuditLogs(logsRes.data.data || []);
+            setAuditLogs(logsRes.data.data?.logs || []);
             setSessions(sessRes.data.data || []);
         } catch (err) {
             // silent

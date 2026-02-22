@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, Search, MoreVertical, Fingerprint, User, Calendar, CheckCircle2, Database, AlertTriangle, Sparkles, Table as TableIcon, Loader2, Hash, Key, Clock, Type } from 'lucide-react';
+import { ChevronLeft, Fingerprint, Calendar, CheckCircle2, Database, Sparkles, Table as TableIcon, Loader2, Hash, Key, Type } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { explorerAPI } from '../services/api';
 import { useConnection } from '../context/ConnectionContext';
@@ -78,7 +78,7 @@ export default function TableDetail() {
 
     return (
         <div className="flex-1 min-h-screen bg-[#f8fafc] lg:p-10 pb-32">
-            {/* Header */}
+            {/* Mobile Header */}
             <div className="bg-white/40 backdrop-blur-xl border-b border-insight-border sticky top-0 z-30 px-6 py-6 flex lg:hidden items-center">
                 <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-insight-text">
                     <ChevronLeft size={24} />
@@ -86,18 +86,26 @@ export default function TableDetail() {
                 <span className="flex-1 text-center font-black capitalize">{tableName} Table</span>
             </div>
 
-            <div className="max-w-6xl mx-auto space-y-10 py-6 px-6 lg:px-0">
-                {/* Desktop Title & Actions */}
-                <div className="hidden lg:flex items-end justify-between">
-                    <div>
-                        <div className="flex items-center gap-3 text-brand font-black text-xs uppercase tracking-widest mb-3">
-                            <TableIcon size={16} fill="currentColor" />
-                            Table Information
+            <div className="max-w-7xl mx-auto space-y-10 py-6 px-6 lg:px-0">
+                {/* Desktop Header */}
+                <div className="hidden lg:flex items-start justify-between">
+                    <div className="flex gap-8 items-center">
+                        <button
+                            onClick={() => navigate(-1)}
+                            className="w-16 h-16 bg-white border border-insight-border rounded-2xl flex items-center justify-center hover:bg-slate-50 transition-colors shadow-sm"
+                        >
+                            <ChevronLeft size={28} className="text-[#0f172a]" />
+                        </button>
+                        <div>
+                            <div className="flex items-center gap-3 text-brand font-black text-[10px] uppercase tracking-[0.2em] mb-3">
+                                <TableIcon size={14} fill="currentColor" />
+                                Table Detail
+                            </div>
+                            <h1 className="text-5xl font-black text-[#0f172a] tracking-tight capitalize">{tableName} Table</h1>
+                            <p className="text-insight-muted font-bold mt-2">
+                                {stats?.totalRows ? `${Number(stats.totalRows).toLocaleString()} rows` : ''} {stats?.columnCount ? `• ${stats.columnCount} columns` : ''} {stats?.completeness ? `• Completeness: ${stats.completeness}` : ''}
+                            </p>
                         </div>
-                        <h1 className="text-5xl font-black text-[#0f172a] tracking-tight capitalize">{tableName} Table</h1>
-                        <p className="text-insight-muted font-bold mt-2">
-                            {stats?.row_count ? `${Number(stats.row_count).toLocaleString()} rows` : ''} {stats?.total_size ? `• ${stats.total_size}` : ''} {stats?.last_analyzed ? `• Last analyzed: ${new Date(stats.last_analyzed).toLocaleDateString()}` : ''}
-                        </p>
                     </div>
                     <div className="flex gap-4">
                         <button onClick={fetchDataPreview} className="px-8 py-4 bg-white rounded-2xl border border-insight-border font-bold shadow-sm hover:bg-insight-bg transition-colors">
@@ -153,14 +161,14 @@ export default function TableDetail() {
                         </div>
                     </div>
 
-                    {/* Stats & Quality */}
+                    {/* Stats & AI Summary */}
                     <div className="space-y-6">
                         <h3 className="text-xl font-black text-[#0f172a] tracking-tight">Table Stats</h3>
                         <div className="space-y-4">
                             {[
-                                { label: 'Total Rows', val: stats?.row_count ? Number(stats.row_count).toLocaleString() : 'N/A', status: stats?.total_size || '', color: 'green' },
+                                { label: 'Total Rows', val: stats?.totalRows ? Number(stats.totalRows).toLocaleString() : 'N/A', status: stats?.completeness || '', color: 'green' },
                                 { label: 'Columns', val: columns.length.toString(), status: `${columns.filter(c => c.is_nullable === 'YES').length} nullable`, color: 'brand' },
-                                { label: 'Indexes', val: stats?.index_count?.toString() || '0', status: stats?.indexes_size || '', color: 'rose' },
+                                { label: 'Data Quality', val: stats?.completeness || 'N/A', status: stats?.totalNulls != null ? `${stats.totalNulls} nulls` : '', color: 'rose' },
                             ].map((item, i) => (
                                 <div key={i} className="premium-card p-6 flex items-center justify-between border-l-[6px]" style={{ borderColor: item.color === 'brand' ? '#6d28d9' : item.color === 'green' ? '#22c55e' : '#f43f5e' }}>
                                     <div>
@@ -170,22 +178,22 @@ export default function TableDetail() {
                                     <span className="text-xs font-black bg-slate-100 px-3 py-1 rounded-lg text-slate-600">{item.status}</span>
                                 </div>
                             ))}
+                        </div>
 
-                            {/* AI Intelligence Card */}
-                            <div className="mt-6 bg-[#0f172a] rounded-[32px] p-8 text-white relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-brand/20 blur-3xl rounded-full translate-x-10 -translate-y-10 group-hover:scale-150 transition-transform duration-700"></div>
-                                <div className="relative z-10">
-                                    <div className="flex items-center gap-3 mb-6">
-                                        <Sparkles size={24} className="text-brand" fill="currentColor" />
-                                        <span className="font-black text-lg tracking-tight">AI Agent Summary</span>
-                                    </div>
-                                    <p className="text-sm font-medium leading-relaxed text-slate-300">
-                                        The <span className="text-white font-bold capitalize">{tableName}</span> table has {columns.length} columns
-                                        with {columns.filter(c => c.is_primary_key).length} primary key{columns.filter(c => c.is_primary_key).length !== 1 ? 's' : ''}.
-                                        {stats?.row_count ? ` Contains ${Number(stats.row_count).toLocaleString()} records.` : ''}
-                                        {columns.filter(c => c.is_nullable === 'YES').length > 0 ? ` ${columns.filter(c => c.is_nullable === 'YES').length} columns allow null values.` : ' All columns are non-nullable.'}
-                                    </p>
+                        {/* AI Summary Card */}
+                        <div className="bg-[#0f172a] rounded-[32px] p-8 text-white relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-brand/10 blur-[80px] rounded-full"></div>
+                            <div className="relative z-10 space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <Sparkles className="text-brand" size={20} />
+                                    <span className="text-sm font-black tracking-tight">AI Summary</span>
                                 </div>
+                                <p className="text-sm font-medium leading-relaxed text-slate-300">
+                                    The <span className="text-white font-bold capitalize">{tableName}</span> table has {columns.length} columns
+                                    with {columns.filter(c => c.is_primary_key).length} primary key{columns.filter(c => c.is_primary_key).length !== 1 ? 's' : ''}.
+                                    {stats?.totalRows ? ` Contains ${Number(stats.totalRows).toLocaleString()} records.` : ''}
+                                    {columns.filter(c => c.is_nullable === 'YES').length > 0 ? ` ${columns.filter(c => c.is_nullable === 'YES').length} columns allow null values.` : ' All columns are non-nullable.'}
+                                </p>
                             </div>
                         </div>
                     </div>
