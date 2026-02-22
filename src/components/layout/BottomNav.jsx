@@ -8,7 +8,7 @@ export default function BottomNav() {
 
     const items = [
         { icon: LayoutGrid, label: 'Explorer', path: '/explorer' },
-        { icon: BarChart3, label: 'Insights', path: '/insights' },
+        { icon: Database, label: 'Connect', path: '/' },
         { icon: Sparkles, label: 'AI Chat', path: '/ai-chat' },
         { icon: User, label: 'Profile', path: '/profile' },
     ];
