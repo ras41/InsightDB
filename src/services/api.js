@@ -73,9 +73,9 @@ export const queryAPI = {
 // ─── Insights ────────────────────────────────────────────
 export const insightsAPI = {
   getOverview: (connId) => api.get(`/insights/${connId}/overview`),
+  getAutoInsights: (connId) => api.get(`/insights/${connId}/auto`),
   getTableInsights: (connId, table) =>
     api.get(`/insights/${connId}/tables/${table}`),
-  getTrends: (connId) => api.get(`/insights/${connId}/trends`),
 };
 
 // ─── AI Chat ─────────────────────────────────────────────
@@ -83,6 +83,7 @@ export const chatAPI = {
   sendMessage: (data) => api.post("/chat/message", data),
   getSessions: () => api.get("/chat/sessions"),
   getHistory: (sessionId) => api.get(`/chat/sessions/${sessionId}`),
+  deleteSession: (sessionId) => api.delete(`/chat/sessions/${sessionId}`),
 };
 
 // ─── Security ────────────────────────────────────────────
@@ -107,7 +108,7 @@ export const profileAPI = {
 // ─── Settings ────────────────────────────────────────────
 export const settingsAPI = {
   getAll: () => api.get("/settings"),
-  update: (key, data) => api.put(`/settings/${key}`, data),
+  update: (key, value) => api.put("/settings", { key, value }),
   bulkUpdate: (data) => api.put("/settings/bulk", data),
   reset: () => api.post("/settings/reset"),
 };

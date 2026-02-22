@@ -30,11 +30,25 @@ export default function Settings() {
         }
     };
 
+    const isEnabled = (val) => {
+        if (val === null || val === undefined || val === false || val === 'false') return false;
+        if (val === true || val === 'true') return true;
+        if (typeof val === 'object') return Object.keys(val).length > 0;
+        if (typeof val === 'string') return val === 'dark'; // for systemMode
+        return false;
+    };
+
     const handleToggleSetting = async (key) => {
         const currentValue = settings[key];
-        const newValue = currentValue === 'true' || currentValue === true ? 'false' : 'true';
+        const enabled = isEnabled(currentValue);
+        let newValue;
+        if (key === 'systemMode') {
+            newValue = enabled ? 'light' : 'dark';
+        } else {
+            newValue = !enabled;
+        }
         try {
-            await settingsAPI.update(key, { value: newValue });
+            await settingsAPI.update(key, newValue);
             setSettings(prev => ({ ...prev, [key]: newValue }));
             toast.success(`${key} updated`);
         } catch (err) {
@@ -57,7 +71,7 @@ export default function Settings() {
         { icon: Palette, label: 'Appearance', desc: 'Customize themes and interface colors', key: 'appearance' },
         { icon: Globe, label: 'Integrations', desc: 'Connect third-party data platforms', key: 'integrations' },
         { icon: CreditCard, label: 'Billing', desc: 'Manage your subscription and usage', key: 'billing' },
-        { icon: Moon, label: 'System Mode', desc: 'Switch between light and dark themes', key: 'darkMode' },
+        { icon: Moon, label: 'System Mode', desc: 'Switch between light and dark themes', key: 'systemMode' },
     ];
 
     if (loading) {
@@ -101,7 +115,7 @@ export default function Settings() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                {settings[opt.key] === 'true' || settings[opt.key] === true ? (
+                                {isEnabled(settings[opt.key]) ? (
                                     <span className="text-xs font-black text-green-600 bg-green-50 px-3 py-1 rounded-lg">ON</span>
                                 ) : (
                                     <span className="text-xs font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-lg">OFF</span>
