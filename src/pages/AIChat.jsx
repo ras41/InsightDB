@@ -6,6 +6,91 @@ import { useConnection } from '../context/ConnectionContext';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
+/** Lightweight markdown renderer for AI responses */
+function renderMarkdown(text) {
+    if (!text) return null;
+
+    // Split by code blocks first
+    const parts = text.split(/(```[\s\S]*?```)/g);
+
+    return parts.map((part, i) => {
+        // Fenced code block
+        if (part.startsWith('```')) {
+            const match = part.match(/^```(\w*)?\n?([\s\S]*?)```$/);
+            const lang = match?.[1] || '';
+            const code = match?.[2]?.trim() || part.slice(3, -3).trim();
+            return (
+                <div key={i} className="my-3 rounded-2xl overflow-hidden bg-[#0f172a] shadow-lg">
+                    {lang && <div className="px-4 py-1.5 bg-white/5 text-[10px] font-black text-brand uppercase tracking-widest">{lang}</div>}
+                    <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed text-green-300 font-mono">{code}</pre>
+                </div>
+            );
+        }
+
+        // Process inline markdown line by line
+        const lines = part.split('\n');
+        return lines.map((line, j) => {
+            const key = `${i}-${j}`;
+
+            // Empty line = paragraph break
+            if (line.trim() === '') return <div key={key} className="h-2" />;
+
+            // Heading ### / ## / #
+            const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+            if (headingMatch) {
+                const level = headingMatch[1].length;
+                const headingText = renderInline(headingMatch[2]);
+                if (level === 1) return <h3 key={key} className="text-lg font-black text-[#0f172a] mt-3 mb-1">{headingText}</h3>;
+                if (level === 2) return <h4 key={key} className="text-base font-black text-[#0f172a] mt-2 mb-1">{headingText}</h4>;
+                return <h5 key={key} className="text-sm font-black text-[#0f172a] mt-2 mb-1">{headingText}</h5>;
+            }
+
+            // Bullet points (• or - or *)
+            const bulletMatch = line.match(/^\s*[•\-*]\s+(.+)$/);
+            if (bulletMatch) {
+                return (
+                    <div key={key} className="flex gap-3 items-start ml-1 my-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand mt-2 shrink-0" />
+                        <span>{renderInline(bulletMatch[1])}</span>
+                    </div>
+                );
+            }
+
+            // Numbered list
+            const numMatch = line.match(/^\s*(\d+)\.\s+(.+)$/);
+            if (numMatch) {
+                return (
+                    <div key={key} className="flex gap-3 items-start ml-1 my-0.5">
+                        <span className="text-brand font-black text-xs mt-0.5 shrink-0">{numMatch[1]}.</span>
+                        <span>{renderInline(numMatch[2])}</span>
+                    </div>
+                );
+            }
+
+            // Regular line
+            return <span key={key}>{renderInline(line)}{'\n'}</span>;
+        });
+    });
+}
+
+/** Render inline markdown: **bold**, `code`, *italic* */
+function renderInline(text) {
+    // Split by inline patterns
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g);
+    return parts.map((p, i) => {
+        if (p.startsWith('**') && p.endsWith('**')) {
+            return <strong key={i} className="font-black text-[#0f172a]">{p.slice(2, -2)}</strong>;
+        }
+        if (p.startsWith('`') && p.endsWith('`')) {
+            return <code key={i} className="bg-brand/10 text-brand font-mono text-[13px] px-1.5 py-0.5 rounded-md font-bold">{p.slice(1, -1)}</code>;
+        }
+        if (p.startsWith('*') && p.endsWith('*')) {
+            return <em key={i}>{p.slice(1, -1)}</em>;
+        }
+        return p;
+    });
+}
+
 export default function AIChat() {
     const navigate = useNavigate();
     const { activeConnection } = useConnection();
@@ -39,7 +124,7 @@ export default function AIChat() {
                 sessionId: sessionId,
             });
             const data = res.data.data;
-            setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+            setMessages(prev => [...prev, { role: 'assistant', content: data.message?.content || data.response || 'No response' }]);
             if (data.sessionId) setSessionId(data.sessionId);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to get AI response');
@@ -94,8 +179,8 @@ export default function AIChat() {
                                 </div>
                                 <div className="space-y-3">
                                     <p className="text-[10px] font-black text-insight-muted uppercase tracking-[0.2em] ml-1">Insight AI Agent</p>
-                                    <div className="bg-[#f1f5f9] rounded-[28px] rounded-tl-none p-6 text-[#1e293b] text-[16px] font-medium leading-relaxed shadow-sm whitespace-pre-wrap">
-                                        {msg.content}
+                                    <div className="bg-[#f1f5f9] rounded-[28px] rounded-tl-none p-6 text-[#1e293b] text-[15px] font-medium leading-relaxed shadow-sm">
+                                        {renderMarkdown(msg.content)}
                                     </div>
                                 </div>
                             </div>
