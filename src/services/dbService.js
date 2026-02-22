@@ -1,4 +1,4 @@
-// Simulated database schema and data
+// Simulated database service for production-ready frontend development
 const MOCK_DB = {
     tables: [
         { id: '1', name: 'orders', rows: 1240, size: '4.2 MB', schema: 'public', type: 'table', icon: 'table', description: 'Store transactions and order status', updatedAt: '2m ago' },
@@ -159,6 +159,46 @@ export const dbService = {
             .replace(/;/g, ';\n');
 
         return formatted;
+    },
+
+    async getInsights() {
+        await delay(1200); // Simulate heavy AI computations
+        return {
+            kpis: [
+                { title: 'Total Revenue', value: '$84,230.12', trend: '+12.4%', up: true, icon: 'zap', color: 'text-brand bg-brand/5' },
+                { title: 'Active Users', value: '1,240', trend: '+4.2%', up: true, icon: 'users', color: 'text-indigo-600 bg-indigo-50' },
+                { title: 'Churn Rate', value: '0.8%', trend: '-2.1%', up: false, icon: 'target', color: 'text-rose-600 bg-rose-50' },
+            ],
+            trends: [
+                { month: 'JAN', value: 40 },
+                { month: 'FEB', value: 70 },
+                { month: 'MAR', value: 45 },
+                { month: 'APR', value: 90 },
+                { month: 'MAY', value: 65 },
+                { month: 'JUN', value: 80 },
+                { month: 'JUL', value: 55 },
+                { month: 'AUG', value: 95 },
+            ],
+            aiProjection: {
+                growth: '8.2%',
+                summary: 'Based on current ingestion patterns, your high-value customers are increasing frequency but decreasing basket size.'
+            }
+        };
+    },
+
+    async getSavedQueries() {
+        await delay(400);
+        return [
+            { id: 'q1', title: 'Monthly Revenue', sql: 'SELECT date_trunc(\'month\', created_at), sum(total) FROM orders GROUP BY 1', lastRun: '2h ago', rows: '12 rows' },
+            { id: 'q2', title: 'High Value Customers', sql: 'SELECT * FROM customers WHERE lifetime_value > 1000', lastRun: 'Yesterday', rows: '45 rows' },
+            { id: 'q3', title: 'Inventory Alert', sql: 'SELECT name, stock FROM products WHERE stock < 10', lastRun: '3 days ago', rows: '8 rows' },
+        ];
+    },
+
+    async saveQuery(title, sql) {
+        await delay(800);
+        console.log(`[BE Simulator] Saving query "${title}": ${sql}`);
+        return { success: true, id: Math.random().toString(36).substr(2, 9) };
     },
 
     async exportTableData(tableName, format = 'csv') {
